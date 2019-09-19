@@ -4,7 +4,7 @@ seedval = Math.random();
 centerx = 0;
 centery = 0;
 // algorithm = prompt('Algorithm:')
-algorithm = 'nc'
+algorithm = 'w'
 numerical = false;
 // numerical = prompt('Numerical?:') == 'y';
 iterations = 0;
@@ -94,19 +94,28 @@ window.onload = function () {
 function recompile() {
     const vertex = compile(ctx, ctx.VERTEX_SHADER, `
 precision highp float;
+
 attribute vec4 position;
+uniform float scale;
+uniform float cx;
+uniform float cy;
 varying vec2 num;
+
 void main(void) {
     gl_Position = position;
-    num = gl_Position.xy * float(${scale}) + vec2(${centerx}, ${centery});
+    num = gl_Position.xy * scale + vec2(cx, cy);
 }
 `);
     const fragment = compile(ctx, ctx.FRAGMENT_SHADER, `
 #define count ${requation.length}
 #define MAX_ITER ${max_iterations}
+
 precision highp float;
+
 uniform vec2 coefs[count];
+uniform float seed;
 varying vec2 num;
+
 vec2 complex_mul(vec2 a, vec2 b)
 {
   return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
@@ -120,6 +129,7 @@ vec2 complex_sqrt(vec2 a)
   float ab = length(a);
   return vec2(sqrt(0.5 * (ab + a.x)), (a.y < 0.0 ? -1.0 : 1.0) * sqrt(0.5 * (ab - a.x)));
 }
+
 vec2 poly(vec2 x) {
     vec2 result = coefs[0];
     for (int c = 1; c < count; c++) {
@@ -128,6 +138,7 @@ vec2 poly(vec2 x) {
     }
     return result;
 }
+
 vec2 diff(vec2 x) {
     vec2 result = coefs[0] * float(count - 1);
     for (int c = 1; c < count - 1; c++) {
@@ -136,6 +147,7 @@ vec2 diff(vec2 x) {
     }
     return result;
 }
+
 vec2 diff2(vec2 x) {
     vec2 result = coefs[0] * float(count - 1) * float(count - 2);
     for (int c = 1; c < count - 2; c++) {
@@ -144,18 +156,21 @@ vec2 diff2(vec2 x) {
     }
     return result;
 }
+
 float shade(float x) {
     float contrast = 10.0;
     return (exp(contrast * x) - 1.0) / (exp(contrast) - 1.0);
 }
+
 vec3 hash(vec2 z) {
     z += vec2(1e-2, 1e-2);
     float a = float(int(z.x * 1e10)) / 1e10;
     float b = float(int(z.y * 1e10)) / 1e10;
-    float alt = 0.9 + 0.1 * ${seed};
+    float alt = 0.9 + 0.1 * seed;
     float rand = a * 1.0 / alt + b * exp(1.0 / alt);
     return vec3(mod(547.0 * rand, 1.0), mod(103.0 * rand, 1.0), mod(709.0 * rand, 1.0));
 }
+
 vec4 cw(vec2 z)
 {
     float h = atan(-z.y,-z.x) * 3.0 / ${pi_s} + 3.0;
@@ -298,10 +313,9 @@ void main()
     redraw(centerx, centery, scale);
 }
 
-function redraw(centerx, centery, scale) {
-    
-        range.innerHTML = `Range: ${scale}`;
-        center.innerHTML = `Center: ${centerx} ${centery}`;
+function redraw(cx, cy, scale) {
+    range.innerHTML = `Range: ${scale}`;
+    center.innerHTML = `Center: ${cx} ${cy}`;
     ctx.clearColor(0.0, 0.0, 0.0, 1.0);
     ctx.clear(ctx.COLOR_BUFFER_BIT | ctx.DEPTH_BUFFER_BIT);
 
@@ -322,8 +336,16 @@ function redraw(centerx, centery, scale) {
     ctx.enableVertexAttribArray(pos);
     ctx.useProgram(program);
 
+    const seed = ctx.getUniformLocation(program, "seed");
+    ctx.uniform1f(seed, seedval);
     const coefs = ctx.getUniformLocation(program, "coefs");
     ctx.uniform2fv(coefs, new Float32Array([...Array(2*requation.length).keys()].map(i => i%2 ? iequation[(i-1)/2] : requation[i/2])));
+    const cxl = ctx.getUniformLocation(program, "cx");
+    ctx.uniform1f(cxl, cx);
+    const cyl = ctx.getUniformLocation(program, "cy");
+    ctx.uniform1f(cyl, cy);
+    const scalel = ctx.getUniformLocation(program, "scale");
+    ctx.uniform1f(scalel, scale);
     const vertexCount = 4;
     ctx.drawArrays(ctx.TRIANGLE_STRIP, offset, vertexCount);
 }
